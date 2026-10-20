@@ -64,13 +64,22 @@ public class ResourceWalker {
 	public static void checkForLocalOverrideDirectory(Runnable creator) {
 		Path curDir = Paths.get(Main.deviceConfigs);
 		curDir = curDir.normalize();
-		if (Files.exists(curDir)) {
+		if (Files.exists(curDir) && containsConfigurations(curDir)) {
 			logger.info("local override directory = {}", curDir.toAbsolutePath());
 			ResourceWalker.setLocalDirPath(curDir);
 		} else {
-			logger.info("creating local override directory {}", curDir.toAbsolutePath());
+			// the directory may exist without configurations (e.g. created by a run where none were available)
+			logger.info("populating local override directory {}", curDir.toAbsolutePath());
 			creator.run();
 			ResourceWalker.setLocalDirPath(curDir);
+		}
+	}
+
+	private static boolean containsConfigurations(Path dir) {
+		try (var files = Files.list(dir)) {
+			return files.anyMatch(p -> p.getFileName().toString().endsWith(".xlsx"));
+		} catch (IOException e) {
+			return true;
 		}
 	}
 
