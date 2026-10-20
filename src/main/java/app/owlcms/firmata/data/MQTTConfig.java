@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.firmata4j.firmata.FirmataDevice;
 import org.firmata4j.transport.JSerialCommTransport;
@@ -204,7 +205,18 @@ public class MQTTConfig {
 	
 	public List<SerialPort> getSerialPorts() {
 		SerialPort[] ports = SerialPort.getCommPorts();
-		return Arrays.asList(ports);
+		if (!System.getProperty("os.name", "").toLowerCase().contains("mac")) {
+			return Arrays.asList(ports);
+		}
+		// macOS lists every device twice (cu.* and tty.*) and has built-in ports that are never boards and make
+		// probing time out.
+		return Arrays.stream(ports)
+		        .filter(p -> {
+			        String name = p.getSystemPortName();
+			        String lower = name.toLowerCase();
+			        return name.startsWith("cu.") && !lower.contains("bluetooth") && !lower.contains("debug-console");
+		        })
+		        .collect(Collectors.toList());
 	}
 	
 	public synchronized void saveSettings() {
