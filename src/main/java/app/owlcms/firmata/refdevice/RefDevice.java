@@ -8,11 +8,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
 import org.firmata4j.IODevice;
 import org.firmata4j.Pin;
 import org.firmata4j.Pin.Mode;
+import org.firmata4j.firmata.FirmataMessageFactory;
 import org.slf4j.LoggerFactory;
 
 import app.owlcms.firmata.eventhandlers.InputEventHandler;
@@ -242,6 +245,10 @@ public class RefDevice {
 
 	Map<Byte, List<Interruptible>> toBeInterrupted = new HashMap<>();
 
+	/** tones waiting for other pins to join, keyed by their parameters */
+	private final Map<String, ToneDoer> pendingTones = new HashMap<>();
+	private static final long TONE_GATHER_MS = 50;
+
 	public synchronized void addInterruptible(byte interruptionButtonIndex, app.owlcms.firmata.refdevice.Interruptible th) {
 		List<Interruptible> threads = toBeInterrupted.get(interruptionButtonIndex);
 		if (threads == null) {
@@ -309,12 +316,9 @@ public class RefDevice {
 	}
 
 	public class ToneDoer implements Interruptible {
-		private boolean interrupted;
-		private String whereFrom;
-
-		public ToneDoer(String string) {
-			this.whereFrom = string;
-		}
+		private volatile boolean interrupted;
+		private final List<Pin> pins = new ArrayList<>();
+		private final CountDownLatch done = new CountDownLatch(1);
 
 		@Override
 		public boolean isInterrupted() {
@@ -326,7 +330,7 @@ public class RefDevice {
 			this.interrupted = interrupted;
 		}
 
-		public void doit(String[] params, Pin pin, RefDevice board) {
+		public void doit(String[] params, RefDevice board) {
 			try {
 				interrupted: for (int i = 0; i < params.length; i = i + 2) {
 					try {
@@ -336,23 +340,41 @@ public class RefDevice {
 						var curNote = Note.valueOf(params[i].trim());
 						var curDuration = Integer.parseInt(params[i + 1].trim());
 						logger.debug("*** {} {}",curNote,curDuration);
-						Tone tone = new Tone(curNote.getFrequency(), curDuration, pin, board);
+						Tone tone = new Tone(curNote.getFrequency(), curDuration, pins, board);
 						tone.playWait(this);
 					} catch (InterruptedException e) {
 						break interrupted;
 					} catch (IllegalArgumentException e1) {
-						logger.error("pin {} illegal TONE pair, expecting Note,Duration: {},{}", pin.getIndex(),
+						logger.error("pins {} illegal TONE pair, expecting Note,Duration: {},{}", pinIndexes(),
 						        params[i], params[i + 1]);
 					}
 				}
 			} catch (ArrayIndexOutOfBoundsException e2) {
-				logger./**/warn("pin {} illegal TONE array length, must be > 0 and multiple of 2", pin.getIndex());
+				logger./**/warn("pins {} illegal TONE array length, must be > 0 and multiple of 2", pinIndexes());
 			}
 		}
 
 		@Override
 		public String getWhereFrom() {
-			return whereFrom;
+			return "Tone " + pinIndexes();
+		}
+
+		private void addPin(Pin pin) {
+			if (!pins.contains(pin)) {
+				pins.add(pin);
+			}
+		}
+
+		private void awaitDone() {
+			try {
+				done.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+		}
+
+		private String pinIndexes() {
+			return pins.stream().map(p -> Byte.toString(p.getIndex())).collect(Collectors.joining(","));
 		}
 	}
 	
@@ -419,14 +441,51 @@ public class RefDevice {
 		}
 	}
 
+	/**
+	 * Play a tone on a pin. owlcms sends a separate message for each referee when summoning all of them, so
+	 * identical tones requested on this board within {@link #TONE_GATHER_MS} are merged and played by a single loop
+	 * that switches all their pins together. Separate loops would compete for the serial link and produce a
+	 * distorted, slower sound.
+	 *
+	 * @return the doer, once the tone is over (for all the merged pins)
+	 */
 	public ToneDoer doTones(Pin pin, String parameters) {
-		String[] topLevelParams = parameters.split("[-]");
-		String[] params = topLevelParams[0].trim().split("[,;]");
-		
-		List<Integer> interruptionButtonInts = readInterruptionButtons(pin, topLevelParams, 1);
-		ToneDoer th = new ToneDoer("Tone " + pin.getIndex());
-		addInterruptible(interruptionButtonInts, th);
-		th.doit(params, pin, this);
+		ToneDoer th;
+		boolean leader = false;
+		synchronized (pendingTones) {
+			th = pendingTones.get(parameters);
+			if (th == null) {
+				th = new ToneDoer();
+				pendingTones.put(parameters, th);
+				leader = true;
+			}
+			th.addPin(pin);
+		}
+		if (!leader) {
+			th.awaitDone();
+			return th;
+		}
+
+		try {
+			Thread.sleep(TONE_GATHER_MS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		synchronized (pendingTones) {
+			// no more pins can join once removed
+			pendingTones.remove(parameters);
+		}
+
+		try {
+			String[] topLevelParams = parameters.split("[-]");
+			String[] params = topLevelParams[0].trim().split("[,;]");
+
+			List<Integer> interruptionButtonInts = readInterruptionButtons(pin, topLevelParams, 1);
+			addInterruptible(interruptionButtonInts, th);
+			th.doit(params, this);
+		} finally {
+			th.done.countDown();
+		}
 		return th;
 	}
 	
@@ -455,6 +514,46 @@ public class RefDevice {
 			pin.setValue(l);
 		} catch (IllegalStateException | IOException e) {
 			logger.debug("cannot set pin {} value : {}", pin.getIndex(), e);
+		}
+	}
+
+	/**
+	 * Set several digital output pins to the same value, sending a single message per port.
+	 *
+	 * firmata4j sends a full port message for every pin change, so switching N pins separately costs N serial
+	 * messages. The port value is computed the same way firmata4j does: the other output pins of the port keep their
+	 * current value.
+	 */
+	synchronized public void pinsSetValue(List<Pin> pins, long l) {
+		if (pins.size() == 1) {
+			pinSetValue(pins.get(0), l);
+			return;
+		}
+		Map<Integer, List<Integer>> pinsByPort = pins.stream().map(p -> (int) p.getIndex())
+		        .collect(Collectors.groupingBy(i -> i / 8, TreeMap::new, Collectors.toList()));
+		for (Entry<Integer, List<Integer>> entry : pinsByPort.entrySet()) {
+			int port = entry.getKey();
+			List<Integer> targets = entry.getValue();
+			int portValue = 0;
+			for (int bit = 0; bit < 8; bit++) {
+				int pinIndex = port * 8 + bit;
+				if (pinIndex >= firmataDevice.getPinsCount()) {
+					break;
+				}
+				Pin p = firmataDevice.getPin(pinIndex);
+				if (p.getMode() != Mode.OUTPUT) {
+					continue;
+				}
+				boolean high = targets.contains(pinIndex) ? l > 0 : p.getValue() > 0;
+				if (high) {
+					portValue |= 1 << bit;
+				}
+			}
+			try {
+				firmataDevice.sendMessage(FirmataMessageFactory.setDigitalPinValue((byte) port, (byte) portValue));
+			} catch (IOException e) {
+				logger.debug("cannot set port {} value : {}", port, e);
+			}
 		}
 	}
 }

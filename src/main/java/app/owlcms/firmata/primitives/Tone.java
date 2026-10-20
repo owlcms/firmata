@@ -2,6 +2,7 @@ package app.owlcms.firmata.primitives;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.firmata4j.Pin;
 import org.slf4j.LoggerFactory;
@@ -16,14 +17,19 @@ public class Tone {
 
 	private int frequency;
 	private int msDuration;
-	private Pin pin;
+	private List<Pin> pins;
 
 	private RefDevice board;
+	private long lastValue = -1;
 
-	public Tone(int frequency, int msDuration, Pin pin, RefDevice board) {
+	/**
+	 * @param pins all the pins are driven in phase by a single loop (e.g. all the referee buzzers when summoning
+	 *             all referees)
+	 */
+	public Tone(int frequency, int msDuration, List<Pin> pins, RefDevice board) {
 		this.frequency = frequency;
 		this.msDuration = msDuration;
-		this.pin = pin;
+		this.pins = pins;
 		this.board = board;
 		logger.setLevel(Level.DEBUG);
 	}
@@ -42,18 +48,21 @@ public class Tone {
 			squareNanos = Math.round((upDuration) * 1_000_000_000);
 		} else {
 			upDuration = (1.0D / frequency) / 2;
-			nbFullCycles = (long) ((msDuration / 1000D) * frequency);
+			// each change costs one serial message per port, and the serial link is the bottleneck: divide the
+			// cycles by the number of ports so a merged tone lasts as long as a single-pin one.
+			long nbPorts = Math.max(1, pins.stream().map(p -> p.getIndex() / 8).distinct().count());
+			nbFullCycles = (long) ((msDuration / 1000D) * frequency) / nbPorts;
 			squareNanos = Math.round((upDuration) * 1_000_000_000);
 		}
 
 		var start = System.nanoTime();
-		logger.debug("pin {} frequency {} upDuration {}s nanos {}ns cycles {}", pin.getIndex(), frequency,
+		logger.debug("pins {} frequency {} upDuration {}s nanos {}ns cycles {}", pinIndexes(), frequency,
 		        Double.toString(upDuration), squareNanos, nbFullCycles);
 
 		try {
 			for (int i = 0; i < nbFullCycles; i++) {
 				var curStart = System.nanoTime();
-				board.pinSetValue(pin, frequency > 0 ? 1 : 0);
+				setPins(frequency > 0 ? 1 : 0);
 				while (System.nanoTime() < curStart + squareNanos) {
 					if (parent.isInterrupted()) {
 						return;
@@ -61,7 +70,7 @@ public class Tone {
 					Thread.yield();
 				}
 
-				board.pinSetValue(pin, 0);
+				setPins(0);
 				curStart = System.nanoTime();
 				while (System.nanoTime() < curStart + squareNanos) {
 					if (parent.isInterrupted()) {
@@ -76,11 +85,25 @@ public class Tone {
 			long arg1 = System.nanoTime() - start;
 			logger.debug("done {}ns nano cycle average {}", arg1, (1.0D * arg1) / nbFullCycles);
 			try {
-				board.pinSetValue(pin, 0);
+				board.pinsSetValue(pins, 0);
 			} catch (IllegalStateException e) {
 			}
 		}
 		return;
+	}
+
+	private String pinIndexes() {
+		return pins.stream().map(p -> Byte.toString(p.getIndex())).collect(Collectors.joining(","));
+	}
+
+	/**
+	 * Skip writes that do not change the value (e.g. during a pause) to spare the serial link.
+	 */
+	private void setPins(long value) {
+		if (value != lastValue) {
+			board.pinsSetValue(pins, value);
+			lastValue = value;
+		}
 	}
 
 }
