@@ -8,6 +8,12 @@
 
 ### Release Notes
 
+- 2.7.0
+  - Summon all referees: the referee buzzers now sound together as a single tone that lasts as long as when a single referee is summoned. Previously the sound was distorted and much longer.
+  - macOS: device detection only probes usable serial ports, so boards are no longer listed twice and detection no longer waits on Bluetooth and debug ports.
+  - If the configuration folder contains no device configurations, they are copied again from the distribution.
+  - Technical: migrated to Vaadin 25 and Java 25. The Control Panel installs the required Java automatically.
+
 - 2.6.1
   - No changes in features or behavior. This version fixes the missing release notes and the build process
 
