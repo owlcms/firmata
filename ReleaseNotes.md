@@ -8,6 +8,9 @@
 
 ### Release Notes
 
+- 2.8.0
+  - Jury boxes (`BlueOwl-Jury` and `JuryFull` configurations): the referee lights now turn green when owlcms reports a referee decision as `hidden` (`fop/decision N hidden`), the same as the jury member lights. This is used by the four-member jury review vote in owlcms 69 (TCRR October 2026).
+
 - 2.7.0
   - Summon all referees: the referee buzzers now sound together as a single tone that lasts as long as when a single referee is summoned. Previously the sound was distorted and much longer.
   - macOS: device detection only probes usable serial ports, so boards are no longer listed twice and detection no longer waits on Bluetooth and debug ports.
