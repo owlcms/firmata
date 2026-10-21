@@ -1,5 +1,7 @@
 package app.owlcms.firmata.mqtt;
 
+import java.util.UUID;
+
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +18,7 @@ public class ConfigMQTTMonitor extends AbstractMQTTMonitor {
 
 	static Logger logger = (Logger) LoggerFactory.getLogger(ConfigMQTTMonitor.class);
 	private static final String OWLCMS_CONFIG = "owlcms/fop/config/#";
+	private static final String DEVICE_IDENTIFIER = "config_" + UUID.randomUUID().toString().replace("-", "");
 
 	public ConfigMQTTMonitor() {
 		logger.setLevel(Level.DEBUG);
@@ -32,7 +35,10 @@ public class ConfigMQTTMonitor extends AbstractMQTTMonitor {
 		return connOpts;
 	}
 
-	// Override getDeviceInfo to provide server configuration information
+	@Override
+	protected String getDeviceIdentifier() {
+		return DEVICE_IDENTIFIER;
+	}
 
 	@Override
 	protected String getDeviceInfo() {
