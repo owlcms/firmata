@@ -11,6 +11,7 @@
 - 2.8.0
   - Jury boxes (`BlueOwl-Jury` and `JuryFull` configurations): the referee lights now turn green when owlcms reports a referee decision as `hidden` (`fop/decision N hidden`), the same as the jury member lights. This is used by the four-member jury review vote in owlcms 69 (TCRR October 2026).
   - Multiple Firmata instances can connect to the same owlcms server without repeatedly disconnecting one another's configuration connection, including when an instance has no devices detected.
+  - Fix for missing jar that prevented 2.7.0 from starting
 
 - 2.7.0
   - Summon all referees: the referee buzzers now sound together as a single tone that lasts as long as when a single referee is summoned. Previously the sound was distorted and much longer.
@@ -33,9 +34,4 @@
   - If the port specified ends with 443, the connection will be done using `wss:` to the /mqtt entry point. This is to support the use of MQTT devices on a cloud server.  For example, `testingMqtt.fly.dev` with port `443` will connect to `wss://testingMqtt.fly.dev:443/mqtt`
   - If the port starts with 8 the connection will be using `ws:` instead of `wss:`.  For local tests you can use localhost with port 8080 (or the normal HTTP port of OWLCMS you use).  OWLCMS will be called on the detected machine as `ws://{detected}:8080/mqtt`.
   - Otherwise, `mqtt` is used (the normal 1883 uses the mqtt protocol)
-
-
-##### Known issues
-
-- If several browsers are run at the same time display between browsers will not be synchronized. Normally only one at a time is needed anyway.
 
