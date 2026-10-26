@@ -1,5 +1,9 @@
 # Development Guidance
 
+## Git Commits
+
+- Never add a Copilot `Co-authored-by` trailer to a commit message.
+
 ## Vaadin Concurrency
 
 - Never perform blocking work on the Vaadin UI thread or inside `ui.access(...)`. Run network requests, device I/O, and other blocking work in a background worker.
