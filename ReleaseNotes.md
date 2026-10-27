@@ -8,6 +8,8 @@
 
 ### Release Notes
 
+- 2.8.1: Fixed the tone generation for the "summon all" case.
+
 - 2.8.0
   - Jury boxes (`BlueOwl-Jury` and `JuryFull` configurations): the referee lights now turn green when owlcms reports a referee decision as `hidden` (`fop/decision N hidden`), the same as the jury member lights. This is used by the four-member jury review vote in owlcms 69 (TCRR October 2026).
   - Multiple Firmata instances can connect to the same owlcms server without repeatedly disconnecting one another's configuration connection, including when an instance has no devices detected.

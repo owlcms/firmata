@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="2.8.0"
+VERSION="2.8.1"
 TAG="${1:-$VERSION}"
 # =============================================================================
 # Release script for owlcms-firmata
