@@ -4,9 +4,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Arrays;
 
+import org.eclipse.paho.client.mqttv3.IMqttActionListener;
+import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -35,8 +36,6 @@ public abstract class AbstractMQTTMonitor {
 	protected String brokerUri;
 	// prevent multiple concurrent starts
 	private volatile boolean startedFlag = false;
-	// Add tracking of subscriptions to avoid duplicates
-	private final Set<String> currentSubscriptions = new HashSet<>();
 
 	public void close() {
 		if (client == null) {
@@ -45,8 +44,6 @@ public abstract class AbstractMQTTMonitor {
 		}
 		try {
 			setClosed(true);
-			// Clear subscription tracking on disconnect
-			currentSubscriptions.clear();
 			client.disconnect();
 			client.close();
 			startedFlag = false;
@@ -63,10 +60,6 @@ public abstract class AbstractMQTTMonitor {
 		final long MAX_BACKOFF_MS = 30_000L; // cap at 30s
 		while (!mqttAsyncClient.isConnected() && !isClosed()) {
 			try {
-				// Clear subscriptions on connection loss to allow re-subscription
-				if (attempt > 0) {
-					currentSubscriptions.clear();
-				}
 				// doConnect will generate a new client Id, and wait for completion
 				doConnect();
 				// reset backoff on success
@@ -177,17 +170,8 @@ public abstract class AbstractMQTTMonitor {
 			throw me;
 		}
 		
-		// Only subscribe if we haven't already subscribed to this topic
-		String subscription = getSubscription();
-		if (!currentSubscriptions.contains(subscription)) {
-			client.subscribe(subscription, 0);
-			currentSubscriptions.add(subscription);
-			logger.info("Monitor {} [{}] subscribed to {} {}", 
-				getName(), getDeviceIdentifier(), subscription, client.getCurrentServerURI());
-		} else {
-			logger.debug("Monitor {} [{}] already subscribed to {}", 
-				getName(), getDeviceIdentifier(), subscription);
-		}
+		// The session is clean, so every connection starts without subscriptions and must subscribe again.
+		subscribe(getSubscription());
 	}
 
 	/**
@@ -209,19 +193,46 @@ public abstract class AbstractMQTTMonitor {
 			brokerUri = client.getServerURI();
 			
 			client.connect(connOpts).waitForCompletion();
-			
-			for (String topic : topics) {
-				if (client != null && !currentSubscriptions.contains(topic)) {
-					client.subscribe(topic, 0);
-					currentSubscriptions.add(topic);
-					// Use getDeviceInfo() for logging
-					logger.info("Monitor {} [{}] subscribed to {} {}", clientId, getDeviceInfo(), topic, brokerUri);
-				} else if (currentSubscriptions.contains(topic)) {
-					logger.debug("Monitor {} [{}] already subscribed to {}", clientId, getDeviceInfo(), topic);
-				}
-			}
 		} catch (MqttException e) {
 			logger.error("failed MQTT connect {}", e.getMessage());
+			throw e;
+		}
+		for (String topic : topics) {
+			subscribe(topic);
+		}
+	}
+
+	private void subscribe(String topic) throws MqttException {
+		MqttAsyncClient subscriber = client;
+		String id = subscriber.getClientId();
+		String uri = subscriber.getCurrentServerURI();
+		String monitor = getName() + " [" + getDeviceIdentifier() + "]";
+		try {
+			subscriber.subscribe(topic, 0, null, new IMqttActionListener() {
+				@Override
+				public void onSuccess(IMqttToken token) {
+					// Paho also calls onSuccess for a SUBACK that refuses the topic.
+					int[] grants = token.getGrantedQos();
+					if (grants.length == 1 && grants[0] == 0) {
+						logger.info("Monitor {} subscribed to {} at {} (client {}, QoS 0)", monitor, topic, uri, id);
+					} else if (grants.length == 1 && grants[0] == MqttException.REASON_CODE_SUBSCRIBE_FAILED) {
+						logger.error("MQTT broker {} refused subscription to {} for monitor {} (client {}); not retrying", uri, topic,
+								monitor, id);
+					} else {
+						logger.error("Unexpected MQTT SUBACK {} for topic {} at {} for monitor {} (client {})",
+								Arrays.toString(grants), topic, uri, monitor, id);
+					}
+				}
+
+				@Override
+				public void onFailure(IMqttToken token, Throwable cause) {
+					logger.error("MQTT subscription failed for topic {} at {} for monitor {} (client {})", topic, uri, monitor, id,
+							cause);
+				}
+			});
+		} catch (MqttException e) {
+			logger.error("Could not request MQTT subscription to {} at {} for monitor {} (client {})", topic, uri, monitor, id,
+					e);
 			throw e;
 		}
 	}
@@ -320,8 +331,6 @@ public abstract class AbstractMQTTMonitor {
 	
 	public void stop() {
 		try {
-			// Clear subscription tracking on stop
-			currentSubscriptions.clear();
 			client.disconnect();
 			client.close();
 			startedFlag = false;
@@ -343,9 +352,11 @@ public abstract class AbstractMQTTMonitor {
 		// Use sane MQTT connection defaults
 		connOpts.setKeepAliveInterval(60); // seconds
 		connOpts.setConnectionTimeout(30); // seconds for TCP connect
-		connOpts.setAutomaticReconnect(true);
+		// connectionLoop is the only reconnection mechanism: it subscribes again after connecting. Paho's own
+		// automatic reconnection would reconnect without subscribing (clean session) and could win the race.
+		connOpts.setAutomaticReconnect(false);
 		logger.debug("MQTT connect options: keepAlive={}s, timeout={}s, autoReconnect={}",
-				connOpts.getKeepAliveInterval(), connOpts.getConnectionTimeout(), true);
+				connOpts.getKeepAliveInterval(), connOpts.getConnectionTimeout(), false);
 		return connOpts;
 	}
 
