@@ -7,7 +7,7 @@
 1. Checkout the repositories as peers (side-by-side in the same parent directory):
    ```bash
    cd ~/git  # or your preferred location
-   git clone https://github.com/owlcms/owlcms-firmata.git
+   git clone https://github.com/owlcms/firmata.git
    git clone https://github.com/jflamy/firmata4j.git
    cd firmata4j
    git checkout webserial
@@ -15,7 +15,7 @@
    The directory structure should be:
    ```
    parent-directory/
-     owlcms-firmata/
+     firmata/
      firmata4j/         # on webserial branch
    ```
 2. Make sure you have installed Maven (mvn) and that it is on the PATH

@@ -9,15 +9,15 @@ Instructions for use are found in the [INSTRUCTIONS.md](INSTRUCTIONS.md) file. T
 ## Devices
 Building hardware devices using the Arduino chip is very simple.  For example, here is the circuit for a timekeeper device
 
-![timeKeeperDevice](https://github.com/owlcms/owlcms-firmata/blob/main/diagrams/timekeeper/timekeeperBox.png)
+![timeKeeperDevice](https://github.com/owlcms/firmata/blob/main/diagrams/timekeeper/timekeeperBox.png)
 
 This project provides hardware diagrams and configuration files for the following:
 
-- [Timekeeper Buttons](https://github.com/owlcms/owlcms-firmata/tree/main/diagrams/timekeeper) The buttons can be connected to the announcer laptop and do not interfere, or to a separate timekeeper laptop if one is used.
-- [Refereeing Devices](https://github.com/owlcms/owlcms-firmata/tree/main/diagrams/referee) This is the typical owlcms setup, used with a laptop provides the down signal and buzzer. The design includes LEDs and buzzers to provide reminders and summon the referees. These can be omitted to create a minimal buttons-only design.
-- [Refereeing with External Down Signal Light and Buzzer](https://github.com/owlcms/owlcms-firmata/tree/main/diagrams/refereeDownSignal) Two relays control the external light and buzzer.  This allows compliance with the traditional competition setup.
-- [Jury President Buttons](https://github.com/owlcms/owlcms-firmata/tree/main/diagrams/juryButtons)  This is the typical owlcms setup, used with a laptop that shows the referee and jury member decisions.
-- [Full Jury President Console with Indicator Lights](https://github.com/owlcms/owlcms-firmata/tree/main/diagrams/juryFull). This diagram shows how a device that has all the indicator lights described in the IWF TCRR can be built.
+- [Timekeeper Buttons](https://github.com/owlcms/firmata/tree/main/diagrams/timekeeper) The buttons can be connected to the announcer laptop and do not interfere, or to a separate timekeeper laptop if one is used.
+- [Refereeing Devices](https://github.com/owlcms/firmata/tree/main/diagrams/referee) This is the typical owlcms setup, used with a laptop provides the down signal and buzzer. The design includes LEDs and buzzers to provide reminders and summon the referees. These can be omitted to create a minimal buttons-only design.
+- [Refereeing with External Down Signal Light and Buzzer](https://github.com/owlcms/firmata/tree/main/diagrams/refereeDownSignal) Two relays control the external light and buzzer.  This allows compliance with the traditional competition setup.
+- [Jury President Buttons](https://github.com/owlcms/firmata/tree/main/diagrams/juryButtons)  This is the typical owlcms setup, used with a laptop that shows the referee and jury member decisions.
+- [Full Jury President Console with Indicator Lights](https://github.com/owlcms/firmata/tree/main/diagrams/juryFull). This diagram shows how a device that has all the indicator lights described in the IWF TCRR can be built.
 
 Since everything is defined by configuration files, you can create your own devices as you wish -- for example, creating an announcer keypad with an additional buttons to pause the competition or signal challenges, etc.
 
@@ -27,7 +27,7 @@ The driver relays commands from owlcms to the board and sends events from the bo
 
 ![overview](docs/img/overview.png)
 
-Any board that can be loaded with  [Firmata](https://github.com/firmata/protocol) can be used. Firmata (see the [firmware](https://github.com/owlcms/owlcms-firmata/tree/main/firmware) folder) is loaded once and not touched afterwards.  The program also supports the pin assignments for commercial devices being developed by the [Blue-Owl](https://github.com/scottgonzalez/blue-owl) project.
+Any board that can be loaded with  [Firmata](https://github.com/firmata/protocol) can be used. Firmata (see the [firmware](https://github.com/owlcms/firmata/tree/main/firmware) folder) is loaded once and not touched afterwards.  The program also supports the pin assignments for commercial devices being developed by the [Blue-Owl](https://github.com/scottgonzalez/blue-owl) project.
 
 The pin configuration for a device is read from an Excel spreadsheet.  
 

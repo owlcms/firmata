@@ -8,6 +8,8 @@
 
 ### Release Notes
 
+- 2.8.2: When no serial ports are present, device detection now ends normally with "No devices detected" instead of failing with a `maximumPoolSize must be positive` error dialog. Firmata stays connected to owlcms, and Detect Devices can be used after plugging in a board.
+
 - 2.8.1: Fixed the tone generation for the "summon all" case.
 
 - 2.8.0

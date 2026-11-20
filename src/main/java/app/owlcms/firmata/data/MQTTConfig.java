@@ -310,6 +310,11 @@ public class MQTTConfig {
 		
 		List<SerialPort> serialPorts = getSerialPorts();
 		logger.info("Starting firmware detection on {} ports", serialPorts.size());
+		if (serialPorts.isEmpty()) {
+			progressUpdate.accept(++i);
+			logger.info("Completed firmware detection, no serial ports available");
+			return portToFirmware;
+		}
 		
 		// Use a small thread pool to probe ports in parallel with timeouts so a single
 		// slow/blocked port cannot stall the whole detection loop.

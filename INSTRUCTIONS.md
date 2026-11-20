@@ -4,7 +4,7 @@ The owlcms-firmata program controls devices using Excel configuration files.  Th
 
 ## Installation
 
-These instructions refer to version 2.0. The program is obtained from the [releases directory](https://github.com/jflamy/owlcms-firmata/releases).  
+These instructions refer to version 2.0. The program is obtained from the [releases directory](https://github.com/owlcms/firmata/releases).  
 
 ##### To run on Windows,  download and run the `.exe` installer.
 
@@ -31,7 +31,7 @@ java -jar owlcms-firmata.jar
 
 When the program is started for the first time, it creates a subdirectory in the user's home directory. The subdirectory is called `owlcms\devices` on Windows and `.owlcms/devices` on Mac and Linux/RaspberryOS.
 
-The format for configuration files is documented [here](https://github.com/jflamy/owlcms-firmata/blob/v24/diagrams/CONFIGURATION.md) .
+The format for configuration files is documented [here](https://github.com/owlcms/firmata/blob/v24/diagrams/CONFIGURATION.md) .
 
 > [!NOTE]
 >

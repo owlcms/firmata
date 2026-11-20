@@ -1,6 +1,7 @@
 #!/bin/bash
 VERSION="2.8.1"
 TAG="${1:-$VERSION}"
+REPO="owlcms/firmata"
 # =============================================================================
 # Release script for owlcms-firmata
 # Uses workflow_dispatch trigger with version input parameter
@@ -73,13 +74,12 @@ if git rev-parse "refs/tags/$TAG" &>/dev/null; then
     echo "Error: Tag '$TAG' already exists locally. Delete it first with: git tag -d $TAG"
     exit 1
 fi
-if gh release view "$TAG" --repo "owlcms/owlcms-firmata" &>/dev/null; then
-    echo "Error: Release '$TAG' already exists at https://github.com/owlcms/owlcms-firmata/releases/tag/$TAG"
-    echo "       Delete it first: gh release delete $TAG --repo owlcms/owlcms-firmata --yes"
+if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
+    echo "Error: Release '$TAG' already exists at https://github.com/$REPO/releases/tag/$TAG"
+    echo "       Delete it first: gh release delete $TAG --repo $REPO --yes"
     exit 1
 fi
 
-REPO="owlcms/owlcms-firmata"
 WORKFLOW_FILE="release.yaml"
 
 echo "==== Release $TAG for $REPO ===="
